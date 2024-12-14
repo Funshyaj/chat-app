@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
@@ -11,11 +10,12 @@ const io = socketIo(server, {
   },
 });
 
-let users = {}; // Store users by socket ID
-let offlineMessages = {};
-chatHistories = {};
+const PORT = 5000;
 
-// Handle new socket connections
+let users = {};
+let offlineMessages = {};
+let chatHistories = {};
+
 io.on("connection", (socket) => {
   console.log("New user connected: ", socket.id);
 
@@ -32,8 +32,9 @@ io.on("connection", (socket) => {
         offlineMessages[userId].forEach((message) => {
           io.to(socket.id).emit("receive_message", message);
         });
-        delete offlineMessages[userId]; // Clear delivered messages
+        delete offlineMessages[userId];
         users[name]["id"] = socket.id;
+        socket.emit("registered", users[name]);
         console.log(`User ${name} updated with socket ${socket.id}`);
         console.log("All users:", users);
       }
@@ -49,7 +50,7 @@ io.on("connection", (socket) => {
       console.log(`User ${name} registered with socket ${socket.id}`);
       console.log("All users:", users);
       socket.emit("registered", users[name]);
-      // updated all users
+      // updated all users to show new user to chat with
       io.emit("update_users", Object.values(users));
     }
   });
@@ -64,8 +65,7 @@ io.on("connection", (socket) => {
     socket.emit("name", socket.name);
   });
 
-  // Handle sending a message to a specific user
-
+  // Sending a message to a specific user by socket ID
   socket.on("send_message", (data) => {
     const { receiver_id, text, sender_id, time } = data;
     const message = { sender_id, receiver_id, text, time };
@@ -79,14 +79,14 @@ io.on("connection", (socket) => {
     // checking if user is online, then sending message and save chat history
     if (receiver_id) {
       io.to(receiver_id).emit("receive_message", JSON.stringify(message));
-      // chatHistories[chatId].push(message);
+      chatHistories[chatId].push(message);
       console.log(sender_id + " => " + receiver_id);
     } else {
       // If the recipient is offline, store the message
-      // if (!offlineMessages[receiver_id]) {
-      //   offlineMessages[receiver_id] = [];
-      // }
-      // offlineMessages[receiver_id].push(message);
+      if (!offlineMessages[receiver_id]) {
+        offlineMessages[receiver_id] = [];
+      }
+      offlineMessages[receiver_id].push(message);
       console.log(`Stored offline message for ${receiver_id}`);
     }
   });
@@ -101,8 +101,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// Start the server
-const PORT = process.env.PORT || 5000;
-server.listen(5000, () => {
+server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

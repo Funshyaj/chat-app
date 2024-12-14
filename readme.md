@@ -26,5 +26,5 @@ Start the frontend server
 
 ## Technologies Used
 
-- Frontend -> Next Js
+- Frontend -> Next Js, tailwind, redux toolkit, socket.io-client
 - Backend -> Express Js

@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+p {
+  color: #707991;
+}
+
+h2 {
+  color: #011627;
+  font-weight: 600;
+}
+
+::-webkit-scrollbar {
+  width: 0px;
+}
