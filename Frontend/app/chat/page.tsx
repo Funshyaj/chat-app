@@ -17,7 +17,7 @@ export default function ChatPage() {
         <ChatList />
       </aside>
       <section className="basis-2/3 bg-[#F5F5F5]">
-        <header className="shadow-b-md h-16 bg-white flex items-center pl-5">
+        <header className="shadow-b-md h-[10vh] bg-white flex items-center pl-5">
           {currentChat && (
             <div
               className="flex gap-3 items-center cursor-pointer"

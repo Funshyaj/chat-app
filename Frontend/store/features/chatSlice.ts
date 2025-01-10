@@ -14,7 +14,7 @@ export const chatSlice = createSlice({
   initialState,
   reducers: {
     updateCurrentChat: (state, action) => {
-      // update the chat state object with the object clicked
+      // updating the chat state object with the user clicked
       state.currentChat = action.payload;
     },
   },

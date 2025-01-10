@@ -3,6 +3,7 @@ const http = require("http");
 const socketIo = require("socket.io");
 const app = express();
 const server = http.createServer(app);
+
 const io = socketIo(server, {
   cors: {
     origin: "http://localhost:3000",
@@ -14,7 +15,6 @@ const PORT = 5000;
 
 let users = {};
 let offlineMessages = {};
-let chatHistories = {};
 
 io.on("connection", (socket) => {
   console.log("New user connected: ", socket.id);
@@ -24,21 +24,17 @@ io.on("connection", (socket) => {
     socket.name = name;
     // checking if user with same name exist
     if (name in users) {
-      console.log(name);
+      // bring them back online by updating thier status
       users[name]["online"] = true;
-      userId = users[name]["id"];
+      users[name]["id"] = socket.id;
 
-      if (offlineMessages[userId]) {
-        offlineMessages[userId].forEach((message) => {
-          io.to(socket.id).emit("receive_message", message);
-        });
-        delete offlineMessages[userId];
-        users[name]["id"] = socket.id;
-        socket.emit("registered", users[name]);
-        console.log(`User ${name} updated with socket ${socket.id}`);
-        console.log("All users:", users);
-      }
+      console.log(`User ${name} is back online with socket id ${socket.id}`);
+      console.log(users);
+      socket.emit("registered", users[name]);
+      // update all users to tell them this user is back online
+      io.emit("update_users", Object.values(users));
     } else {
+      // Create a new user
       users[name] = {
         id: socket.id,
         name,
@@ -47,8 +43,8 @@ io.on("connection", (socket) => {
         online: true,
       };
 
-      console.log(`User ${name} registered with socket ${socket.id}`);
-      console.log("All users:", users);
+      console.log(`User ${name} registered with socket id ${socket.id}`);
+      console.log(users);
       socket.emit("registered", users[name]);
       // updated all users to show new user to chat with
       io.emit("update_users", Object.values(users));
@@ -60,35 +56,65 @@ io.on("connection", (socket) => {
     socket.emit("users_list", Object.values(users));
   });
 
-  // Fetch name
+  // Fetch username
   socket.on("get_name", () => {
     socket.emit("name", socket.name);
   });
 
+  // Read message
+  socket.on("read_message", (name) => {
+    users[name]["unread"] = "";
+  });
+
+  // Sending all offline message held in server to receiver
+  socket.on("get_offline_messages", (name) => {
+    if (offlineMessages[name] && offlineMessages[name].length > 0) {
+      offlineMessages[name].forEach((message) => {
+        console.log("sending offline message to:", users[name]["id"]);
+        socket.emit("receive_offline_messages", JSON.stringify(message));
+      });
+      // Clear stored messages for the user once delivered
+      delete offlineMessages[name];
+    }
+  });
+
   // Sending a message to a specific user by socket ID
   socket.on("send_message", (data) => {
-    const { receiver_id, text, sender_id, time } = data;
-    const message = { sender_id, receiver_id, text, time };
-
-    const chatId = [sender_id, receiver_id].join("_");
-    // creating chat array if none existed before
-    if (!chatHistories[chatId]) {
-      chatHistories[chatId] = [];
-    }
+    const { receiver_id, text, sender_id, sender_name, receiver_name, time } =
+      data;
+    const message = {
+      sender_id,
+      sender_name,
+      receiver_name,
+      receiver_id,
+      text,
+      time,
+    };
 
     // checking if user is online, then sending message and save chat history
-    if (receiver_id) {
+    if (users[receiver_name]["online"]) {
       io.to(receiver_id).emit("receive_message", JSON.stringify(message));
-      chatHistories[chatId].push(message);
       console.log(sender_id + " => " + receiver_id);
     } else {
       // If the recipient is offline, store the message
-      if (!offlineMessages[receiver_id]) {
-        offlineMessages[receiver_id] = [];
+      if (!offlineMessages[receiver_name]) {
+        offlineMessages[receiver_name] = [];
       }
-      offlineMessages[receiver_id].push(message);
-      console.log(`Stored offline message for ${receiver_id}`);
+
+      offlineMessages[receiver_name].push(message);
+      users[sender_name]["unread"] = offlineMessages[receiver_name].length;
+      console.log(`Stored offline message for ${receiver_name}`);
     }
+  });
+
+  // Listen for wallpaper change requests
+  socket.on("update_wallpaper", (data) => {
+    const { receiver_id, imageData } = data;
+    // send the new wallpaper to peer
+    console.log(
+      `updating wallpaper for both sender: ${socket.id} and receiver: ${receiver_id}`
+    );
+    io.to(receiver_id).emit("updated_wallpaper", imageData);
   });
 
   // Handle disconnection
