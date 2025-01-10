@@ -6,8 +6,8 @@ import Image from "next/image";
 import { timeStampGenerator } from "@/lib/timeStampGenerator";
 import { useAppSelector } from "@/store/index";
 import socket from "@/lib/socket";
-import PrimaryButton from "@/components/PrimaryButton";
 import { Chat, ChatSessions, sessionWallpapers } from "@/lib/interface";
+import Popover from "./Popover";
 
 const ChatContent = () => {
   const currentChat = useAppSelector((state) => state.chat.currentChat);
@@ -22,7 +22,6 @@ const ChatContent = () => {
   );
 
   const [inputText, setInputText] = useState("");
-  const [file, setFile] = useState<File | null>(null);
   const [sessionWallpaper, setSessionWallpaper] =
     useLocalStorageState<sessionWallpapers>("sessionWallapapers", {
       defaultValue: {},
@@ -81,35 +80,29 @@ const ChatContent = () => {
 
   // Function to handle file input change (image upload)
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]; // Using optional chaining in case `files` is null or undefined
+    const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      setFile(selectedFile);
-      setSessionWallpaper((prev) => ({
-        ...prev,
-        [chatId]: URL.createObjectURL(selectedFile),
-      }));
-    }
-  };
-
-  // Function to upload wallpaper (emits via WebSocket)
-  const uploadWallpaper = () => {
-    if (file) {
-      // sendng file bits
       const reader = new FileReader();
-      reader.readAsDataURL(file); // Convert file to base64
+      reader.readAsDataURL(selectedFile); // Convert file to base64
       reader.onloadend = () => {
-        // Send the base64 string to the server
-        socket.emit("update_wallpaper", {
-          imageData: reader.result,
-          receiver_id: currentChat?.id,
-        });
-
+        // Store base 64 on client
         setSessionWallpaper((prev) => ({
           ...prev,
           [chatId]: reader.result,
         }));
+
+        // Send the base64 string to peer
+        socket.emit("update_wallpaper", {
+          imageData: reader.result,
+          receiver_id: currentChat?.id,
+        });
       };
     }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const triggerImageUpload = () => {
+    fileInputRef.current?.click(); // Trigger the hidden input
   };
 
   // Set background dynamically
@@ -155,11 +148,28 @@ const ChatContent = () => {
       </div>
 
       {/* Message input form */}
-      <div>
+      <div className="flex gap-2 items-center w-2/3 mx-auto">
+        {/* Change background popover */}
+        <Popover>
+          <div className="flex">
+            <p onClick={triggerImageUpload}>change background image</p>
+            <input
+              type="file"
+              name="image"
+              id="image"
+              hidden
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+        </Popover>
+
+        {/* Message fomr */}
         <form
           id="chatForm"
           onSubmit={handleMessageSubmit}
-          className="flex items-center w-2/3 mx-auto pl-3 pr-2 bg-white rounded-lg"
+          className="flex items-center w-full pl-3 pr-2 bg-white rounded-lg"
         >
           <input
             value={inputText}
@@ -177,16 +187,6 @@ const ChatContent = () => {
             <Image src={sendIcon} alt="send icon" />
           </button>
         </form>
-
-        <div className="flex">
-          <input
-            type="file"
-            name="image"
-            id="image"
-            onChange={handleFileChange}
-          />
-          <PrimaryButton onClick={uploadWallpaper} label="Set as wallpaper" />
-        </div>
       </div>
     </div>
   );
