@@ -64,6 +64,7 @@ const ChatContent = () => {
       sender_id: user?.id,
       sender_name: user?.name,
       receiver_name: currentChat?.name,
+      // readReceipt:'sent',
       time: timeStampGenerator(new Date()),
     };
 
